@@ -58,6 +58,8 @@ func StartTimeserver() {
 }
 
 func handleTimeserverClient(conn net.Conn) {
+	defer conn.Close()
+
 	msg, err := protocol.ReadNetworkMessage(conn)
 	if err != nil {
 		// TODO(vmykh): maybe panic in such situations (in separate thread)
@@ -84,7 +86,6 @@ func handleTimeserverClient(conn net.Conn) {
 
 	// TODO(vmykh): should we handle error here?
 	conn.Write(timeResBytes)
-	conn.Close()
 }
 
 func GetTimeFromProvider(tsAddr *net.TCPAddr, tsPub *rsa.PublicKey) (timestamp int64, err error) {

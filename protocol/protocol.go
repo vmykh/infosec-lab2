@@ -2,20 +2,16 @@ package protocol
 
 import (
 	"crypto/rsa"
-	//"time"
 	"encoding/binary"
 	"github.com/vmykh/infosec/lab2/utils"
 	"bytes"
-	//"fmt"
 	"crypto/sha256"
 	"crypto"
 	"crypto/rand"
 	"encoding/base64"
 	"fmt"
-	//"github.com/vmykh/infosec/lab2/rsautils"
 	"encoding/gob"
 	"encoding/json"
-	//"go/types"
 	"reflect"
 	"io"
 	"errors"
@@ -28,8 +24,8 @@ const (
 	TrentRequestCode = 3
 	TrentResponseCode = 4
 
-	PeersConnectRequest = 5
-	PeersConnectResponse = 6
+	PeersConnectRequestCode = 5
+	PeersConnectResponseCode = 6
 )
 
 const (
@@ -111,8 +107,8 @@ func int64ToBytes(n int64) []byte {
 
 // region certificate
 type Certificate struct {
-	ClientID string
-	ClientPublicKey string
+	ID        string
+	Pub       string
 	Timestamp int64
 	Signature string
 }
@@ -132,7 +128,7 @@ func CreateCertificate(id string, pubKey *rsa.PublicKey, timestamp int64, tsPriv
 
 // TODO(vmykh): add timestamp checking
 func VerifyCertificate(cert *Certificate, tsPub *rsa.PublicKey) (error) {
-	hashed := hashCertificateInfoWithSha256(cert.ClientID, cert.ClientPublicKey, cert.Timestamp)
+	hashed := hashCertificateInfoWithSha256(cert.ID, cert.Pub, cert.Timestamp)
 	signatureBytes, err := base64.StdEncoding.DecodeString(cert.Signature)
 	if err != nil {
 		return err
@@ -166,7 +162,7 @@ func marshalPublikKey(key *rsa.PublicKey) (string, error) {
 	return b64encoded, nil
 }
 
-func parsePublikKey(keyStr string) (*rsa.PublicKey, error) {
+func ParsePublikKey(keyStr string) (*rsa.PublicKey, error) {
 	keyBytes, err := base64.StdEncoding.DecodeString(keyStr)
 	if err != nil {
 		return nil, err
@@ -255,6 +251,10 @@ func determineMsgCode(m interface{}) (int, error){
 		return TrentRequestCode, nil
 	case *TrentResponse:
 		return TrentResponseCode, nil
+	case *PeersConnectRequest:
+		return PeersConnectRequestCode, nil
+	case *PeersConnectResponse:
+		return PeersConnectResponseCode, nil
 	default:
 		return 0, errors.New("Cannot determine message code for: " + reflect.TypeOf(m).String())
 	}
@@ -271,12 +271,53 @@ func createTargetType(msgCode int) (interface{}, error) {
 		return new(TrentRequest), nil
 	case TrentResponseCode:
 		return new(TrentResponse), nil
+	case PeersConnectRequestCode:
+		return new(PeersConnectRequest), nil
+	case PeersConnectResponseCode:
+		return new(PeersConnectResponse), nil
 	default:
 		return nil, errors.New("Invalid message code")
 	}
 }
 // endregion
 
+// region peers connection
+type PeersConnectRequest struct {
+	ClientCert Certificate
+	R1 string
+}
+
+type PeersConnectResponse struct {
+	F1 string
+	R2 string
+}
+
+func EncryptNumber(n int32, pub *rsa.PublicKey) string {
+	buf := new(bytes.Buffer)
+	err := binary.Write(buf, binary.BigEndian, n)
+	utils.PanicIfError(err)
+
+	label := make([]byte, 0)
+	cipherBytes, err := rsa.EncryptOAEP(sha256.New(), rand.Reader, pub, buf.Bytes(), label)
+	utils.PanicIfError(err)
+
+	return base64.StdEncoding.EncodeToString(cipherBytes)
+}
+
+func DecryptNumber(cipher string, priv *rsa.PrivateKey) int32 {
+	cipherBytes, err := base64.StdEncoding.DecodeString(cipher)
+	utils.PanicIfError(err)
+
+	label := make([]byte, 0)
+	decryptedBytes, err := rsa.DecryptOAEP(sha256.New(), rand.Reader, priv, cipherBytes, label)
+	utils.PanicIfError(err)
+
+	var n int32
+	err = binary.Read(bytes.NewReader(decryptedBytes), binary.BigEndian, &n)
+	utils.PanicIfError(err)
+
+	return n
+}
 
 
 //func CreateMessage(int,msg interface{}) []byte {

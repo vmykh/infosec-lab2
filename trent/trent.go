@@ -41,6 +41,7 @@ func StartTrent() {
 		go handleClient(conn, trent)
 	}
 }
+
 func loadTrentState() *trent {
 	hostIdToKey := loadPubKeys()
 	tsTcpAddr, err := net.ResolveTCPAddr("tcp4", tsAddr)

@@ -1,17 +1,35 @@
 package main
 
 import (
-	"github.com/vmykh/infosec/lab2/utils"
+	//"github.com/vmykh/infosec/lab2/utils"
 	"net"
+	//"crypto/rsa"
+	//"github.com/vmykh/infosec/lab2/rsautils"
+	//"github.com/vmykh/infosec/lab2/keygen"
+	//"github.com/vmykh/infosec/lab2/timeprovider"
+	"github.com/vmykh/infosec/lab2/protocol"
+	"fmt"
 	"crypto/rsa"
 	"github.com/vmykh/infosec/lab2/rsautils"
 	"github.com/vmykh/infosec/lab2/keygen"
-	"github.com/vmykh/infosec/lab2/timeprovider"
-	"github.com/vmykh/infosec/lab2/protocol"
-	"fmt"
+	"math/rand"
+	"github.com/vmykh/infosec/lab2/utils"
+	"log"
+	"reflect"
 )
 
-const ClientID = "default_client"
+const ClientID = "client_1"
+
+const (
+	tsAddr = "localhost:7600"
+)
+
+type client struct {
+	priv     *rsa.PrivateKey
+	tsPub    *rsa.PublicKey
+	tsAddr   *net.TCPAddr
+	trentPub *rsa.PublicKey
+}
 
 // TODO(vmykh): make consistent error handling
 func main() {
@@ -39,12 +57,14 @@ func main() {
 
 	//GetTimeFromServer()
 
-	serverAddr, err := net.ResolveTCPAddr("tcp4", "localhost:7500")
+	clientState := loadClientState()
+
+	trentAddr, err := net.ResolveTCPAddr("tcp4", "localhost:7500")
 	if err != nil {
 		panic(err)
 	}
 
-	conn, err := net.DialTCP("tcp", nil, serverAddr)
+	conn, err := net.DialTCP("tcp", nil, trentAddr)
 	if err != nil {
 		panic(err)
 	}
@@ -66,20 +86,60 @@ func main() {
 		panic("Cannot convert msg to TrentResponse")
 	}
 
+	// TODO(vmykh): add verifying certificates
 	fmt.Println(trentRes)
+
+	// TODO(vmykh): close connection with trent
+
+
+	// connect to server
+	serverAddr, err := net.ResolveTCPAddr("tcp4", "localhost:7700")
+	if err != nil {
+		panic(err)
+	}
+
+	servConn, err := net.DialTCP("tcp", nil, serverAddr)
+	if err != nil {
+		panic(err)
+	}
+
+	r1 := int32(rand.Int())
+	fmt.Printf("rand: %d\n", r1)
+
+	serverPub, err := protocol.ParsePublikKey(trentRes.ServerCert.Pub)
+	utils.PanicIfError(err)
+	r1Encrypted := protocol.EncryptNumber(r1, serverPub)
+	serverReq := protocol.PeersConnectRequest{trentRes.ClientCert, r1Encrypted}
+	serverReqBytes, err := protocol.ConstructNetworkMessage(&serverReq)
+	utils.PanicIfError(err)
+
+	servConn.Write(serverReqBytes)
+
+	servMsg, err := protocol.ReadNetworkMessage(servConn)
+	utils.PanicIfError(err)
+
+	peersConnRes, ok := servMsg.(*protocol.PeersConnectResponse)
+	if !ok {
+		log.Println("Error. Received wrong type of message: " + reflect.TypeOf(msg).String())
+	}
+
+	fmt.Printf("Server response F1: %d\n", protocol.DecryptNumber(peersConnRes.F1, clientState.priv))
 
 }
 
+func loadClientState() *client {
+	tsTcpAddr, err := net.ResolveTCPAddr("tcp4", tsAddr)
+	if err != nil {
+		panic(err)
+	}
+	tsPubKey := new(rsa.PublicKey)
+	rsautils.LoadKey(keygen.GetKeyDir()+"/client/timeserver-public.key", tsPubKey)
 
+	trentPub := new(rsa.PublicKey)
+	rsautils.LoadKey(keygen.GetKeyDir()+"/client/trent-public.key", trentPub)
 
-func GetTimeFromServer() (timestamp int64, err error) {
-	pub := new(rsa.PublicKey)
-	rsautils.LoadKey(keygen.GetKeyDir() + "client/timeserver-public.key", pub)
+	clientPriv := new(rsa.PrivateKey)
+	rsautils.LoadKey(keygen.GetKeyDir() + "/client/client-private.key", clientPriv)
 
-	serverAddr, err := net.ResolveTCPAddr("tcp4", "localhost:7600")
-	utils.ExitIfError(err)
-
-	timeprovider.GetTimeFromProvider(serverAddr, pub)
-
-	return 0, nil
+	return &client{clientPriv, tsPubKey, tsTcpAddr, trentPub}
 }

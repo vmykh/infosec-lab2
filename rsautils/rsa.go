@@ -10,7 +10,7 @@ import (
 
 func GenerateKey() (*rsa.PrivateKey) {
 	reader := rand.Reader
-	bitSize := 512
+	bitSize := 1024
 	key, err := rsa.GenerateKey(reader, bitSize)
 	utils.PanicIfError(err)
 	return key;

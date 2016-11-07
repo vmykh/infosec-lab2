@@ -28,8 +28,8 @@ func GenerateAndSaveKeys()  {
 	rsautils.SaveGobKey(GetKeyDir() + "/trent/server-public.key", serverKey.PublicKey);
 	rsautils.SaveGobKey(GetKeyDir() + "/trent/timeserver-public.key", timeserverKey.PublicKey);
 
-	rsautils.SaveGobKey(GetKeyDir() + "timeserver/timeserver-private.key", timeserverKey);
-	rsautils.SaveGobKey(GetKeyDir() + "timeserver/timeserver-public.key", timeserverKey.PublicKey);
+	rsautils.SaveGobKey(GetKeyDir() + "/timeserver/timeserver-private.key", timeserverKey);
+	rsautils.SaveGobKey(GetKeyDir() + "/timeserver/timeserver-public.key", timeserverKey.PublicKey);
 }
 
 func GetKeyDir() string {
