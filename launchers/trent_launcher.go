@@ -9,9 +9,10 @@ import (
 func main() {
 	var wg sync.WaitGroup
 
-	wg.Add(1)
+	wg.Add(2)
 	//go startTrent(wg)
 	go startTimeserver(wg)
+	go startTrent(wg)
 
 	wg.Wait()
 }

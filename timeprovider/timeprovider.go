@@ -1,5 +1,6 @@
 package timeprovider
 
+// TODO(vmykh): add logging
 import (
 	"net"
 	"fmt"
@@ -24,6 +25,7 @@ import (
 	"strconv"
 	"math/rand"
 	"errors"
+	//"reflect"
 )
 
 const Port = 7600
@@ -36,7 +38,7 @@ var tsPrivateKey *rsa.PrivateKey;
 
 func StartTimeserver() {
 	priv := new(rsa.PrivateKey)
-	rsautils.LoadKey(keygen.KeyDir + "timeserver/timeserver-private.key", priv)
+	rsautils.LoadKey(keygen.GetKeyDir() + "/timeserver/timeserver-private.key", priv)
 	tsPrivateKey = priv
 
 	service := ":" + strconv.Itoa(Port)
@@ -64,7 +66,8 @@ func handleTimeserverClient(conn net.Conn) {
 	}
 	timeReq, ok := msg.(*protocol.TimeRequest)
 	if !ok {
-		fmt.Println("Error. Received wrong message")
+		fmt.Println("Error. Received wrong message: ")
+		fmt.Println(msg)
 		return
 	}
 
@@ -118,8 +121,14 @@ func GetTimeFromProvider(tsAddr *net.TCPAddr, tsPub *rsa.PublicKey) (timestamp i
 	if !ok {
 		return 0, errors.New("Received wrong message")
 	}
-	fmt.Println(timeRes)
-	return 0, nil
+
+	// verify timestamp
+	err = protocol.VerifyTimestamp(timeRes.Timestamp, seed, timeRes.Signature, tsPub)
+	if err != nil {
+		return 0, err
+	}
+
+	return timeRes.Timestamp, nil
 }
 
 

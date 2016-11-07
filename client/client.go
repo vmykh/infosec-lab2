@@ -7,10 +7,13 @@ import (
 	"github.com/vmykh/infosec/lab2/rsautils"
 	"github.com/vmykh/infosec/lab2/keygen"
 	"github.com/vmykh/infosec/lab2/timeprovider"
+	"github.com/vmykh/infosec/lab2/protocol"
+	"fmt"
 )
 
 const ClientID = "default_client"
 
+// TODO(vmykh): make consistent error handling
 func main() {
 	//fmt.Println("Enter password:")
 	//pass, err := gopass.GetPasswdMasked()
@@ -34,14 +37,44 @@ func main() {
 	//
 	//time.Now()
 
-	GetTimeFromServer()
+	//GetTimeFromServer()
+
+	serverAddr, err := net.ResolveTCPAddr("tcp4", "localhost:7500")
+	if err != nil {
+		panic(err)
+	}
+
+	conn, err := net.DialTCP("tcp", nil, serverAddr)
+	if err != nil {
+		panic(err)
+	}
+
+	reqBytes, err := protocol.ConstructNetworkMessage(&protocol.TrentRequest{"client_1", "server_1"})
+	if err != nil {
+		panic(err)
+	}
+
+	conn.Write(reqBytes)
+
+	msg, err := protocol.ReadNetworkMessage(conn)
+	if err != nil {
+		panic(err)
+	}
+
+	trentRes, ok := msg.(*protocol.TrentResponse)
+	if !ok {
+		panic("Cannot convert msg to TrentResponse")
+	}
+
+	fmt.Println(trentRes)
+
 }
 
 
 
 func GetTimeFromServer() (timestamp int64, err error) {
 	pub := new(rsa.PublicKey)
-	rsautils.LoadKey(keygen.KeyDir + "client/timeserver-public.key", pub)
+	rsautils.LoadKey(keygen.GetKeyDir() + "client/timeserver-public.key", pub)
 
 	serverAddr, err := net.ResolveTCPAddr("tcp4", "localhost:7600")
 	utils.ExitIfError(err)
