@@ -15,6 +15,9 @@ import (
 	"reflect"
 	"io"
 	"errors"
+	//"math"
+	"net"
+	"time"
 )
 
 const (
@@ -318,6 +321,84 @@ func DecryptNumber(cipher string, priv *rsa.PrivateKey) int32 {
 
 	return n
 }
+
+// TODO(vmykh): refactor this function to using some strategy maybe, because now it's hardcoded which is not good
+func CreateSymmetricKey(r1 int32, r2 int32) byte {
+	sum := r1 + r2
+	var base int32
+	if (sum >= 0) {
+		base = sum
+	} else {
+		base = -sum
+	}
+	return byte(base % 256)
+}
+
+
+// region secure connection (actually not secure at all)
+// TODO(vmykh): maybe it can be done using embedding (it could reduce amount of code)
+type SecureConn struct {
+	conn net.Conn
+	shift byte
+}
+
+func NewSecureConn(conn net.Conn, shift byte) *SecureConn {
+	return &SecureConn{conn, shift}
+}
+
+func (sc *SecureConn) Read(b []byte) (int, error) {
+	encryptedBytes := make([]byte, len(b))
+	n, err := sc.conn.Read(encryptedBytes)
+	if err != nil {
+		return 0, err
+	}
+
+	for i := 0; i < n; i++ {
+		b[i] = encryptedBytes[i] - sc.shift
+	}
+
+	return n, nil
+}
+
+func (sc *SecureConn) Write(b []byte) (int, error) {
+	inputLen := len(b)
+	encryptedBytes := make([]byte, inputLen)
+	for i := 0; i < inputLen; i++ {
+		encryptedBytes[i] = b[i] + sc.shift
+	}
+
+	n, err := sc.conn.Write(encryptedBytes)
+	if err != nil {
+		return 0, err
+	}
+
+	return n, nil
+}
+
+func (sc *SecureConn) Close() error {
+	return sc.conn.Close()
+}
+
+func (sc *SecureConn) LocalAddr() net.Addr {
+	return sc.conn.LocalAddr()
+}
+
+func (sc *SecureConn) RemoteAddr() net.Addr {
+	return sc.conn.RemoteAddr()
+}
+
+func (sc *SecureConn) SetDeadline(t time.Time) error {
+	return sc.conn.SetDeadline(t)
+}
+
+func (sc *SecureConn) SetReadDeadline(t time.Time) error {
+	return sc.conn.SetReadDeadline(t)
+}
+
+func (sc *SecureConn) SetWriteDeadline(t time.Time) error {
+	return sc.conn.SetWriteDeadline(t)
+}
+// endregion
 
 
 //func CreateMessage(int,msg interface{}) []byte {

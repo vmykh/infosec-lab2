@@ -123,8 +123,25 @@ func main() {
 		log.Println("Error. Received wrong type of message: " + reflect.TypeOf(msg).String())
 	}
 
-	fmt.Printf("Server response F1: %d\n", protocol.DecryptNumber(peersConnRes.F1, clientState.priv))
+	f1 := protocol.DecryptNumber(peersConnRes.F1, clientState.priv)
+	if f1 != (r1 + 1) {
+		panic("Error F1 is not correct")
+	}
 
+	r2 := protocol.DecryptNumber(peersConnRes.R2, clientState.priv)
+
+	fmt.Printf("Server response F1: %d\n", f1)
+	fmt.Printf("Server response R2: %d\n", r2)
+
+	sKey := protocol.CreateSymmetricKey(r1, r2)
+
+	fmt.Printf("Session Key: %d\n", sKey)
+
+	startSession(protocol.NewSecureConn(servConn, sKey))
+}
+
+func startSession(conn net.Conn) {
+	conn.Write([]byte{50, 55, 60})
 }
 
 func loadClientState() *client {

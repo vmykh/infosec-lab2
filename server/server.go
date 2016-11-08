@@ -91,10 +91,46 @@ func handleClient(conn net.Conn, serverState *server) {
 
 	r2 := int32(rand.Int())
 
+	sKey := protocol.CreateSymmetricKey(r1, r2)
+
 	r2Encrypted := protocol.EncryptNumber(r2, clientPub)
 
 	resBytes, err := protocol.ConstructNetworkMessage(&protocol.PeersConnectResponse{f1Encrypted, r2Encrypted})
 	utils.PanicIfError(err)
 
-	conn.Write(resBytes)
+	n, err := conn.Write(resBytes)
+	utils.PanicIfError(err)
+	if n != len(resBytes) {
+		panic("not written fully")
+	}
+
+	startSession(protocol.NewSecureConn(conn, sKey))
 }
+func startSession(conn net.Conn) {
+	b, err := utils.ReadExactly(3, conn)
+	utils.PanicIfError(err)
+
+	fmt.Println("Received and Decrypted:")
+	fmt.Println(b)
+}
+
+// region business logic
+type model interface {
+
+}
+
+type userHandler interface {
+
+	login(login string, password string)
+
+	addUser(uname string, upass string)
+
+	blockUser(uname string)
+
+	changePassword(uname string, oldpass string, newpass string)
+
+	fetchDocument(name string)
+}
+
+
+// endregion
