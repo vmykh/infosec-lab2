@@ -18,6 +18,7 @@ import (
 	//"math"
 	"net"
 	"time"
+	//"math"
 )
 
 const (
@@ -42,6 +43,7 @@ const (
 
 const (
 	MaxMessageSize = 65535
+	CertificateExpirationPeriod = int64(24 * 30 * time.Hour)   // 1 month
 )
 
 type TrentRequest struct {
@@ -139,14 +141,28 @@ func CreateCertificate(id string, pubKey *rsa.PublicKey, timestamp int64, tsPriv
 }
 
 // TODO(vmykh): add timestamp checking
-func VerifyCertificate(cert *Certificate, tsPub *rsa.PublicKey) (error) {
+func VerifyCertificate(cert *Certificate, tsPub *rsa.PublicKey, currentTimestamp int64) (error) {
 	hashed := hashCertificateInfoWithSha256(cert.ID, cert.Pub, cert.Timestamp)
 	signatureBytes, err := base64.StdEncoding.DecodeString(cert.Signature)
 	if err != nil {
 		return err
 	}
 
- 	return rsa.VerifyPKCS1v15(tsPub, crypto.SHA256, hashed, signatureBytes)
+ 	err = rsa.VerifyPKCS1v15(tsPub, crypto.SHA256, hashed, signatureBytes)
+	if err != nil {
+		return err
+	}
+
+	delta := cert.Timestamp - currentTimestamp
+	var absDelta int64
+	if delta < 0 {
+		absDelta = -absDelta
+	}
+	if absDelta > CertificateExpirationPeriod {
+		return errors.New("Certificate is expired")
+	}
+
+	return nil
 }
 
 func hashCertificateInfoWithSha256(id string, keyBase64 string, timestamp int64) []byte {

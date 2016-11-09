@@ -17,6 +17,7 @@ import (
 	"io/ioutil"
 	"os"
 	"time"
+	"github.com/vmykh/infosec/lab2/timeprovider"
 )
 
 const ServerId = "server_1"
@@ -37,35 +38,8 @@ type server struct {
 func StartServer() {
 	servState := loadServerState()
 
-	ticker := time.NewTicker(5 * time.Second)
-	quit := make(chan struct{})
-	go func() {
-		for {
-			select {
-			case <- ticker.C:
-				ums := servState.usrManager.(*userManagerState)
-				ums.mutex.Lock()
-				usersArr := make([]user, len(ums.users))
-				i := 0
-				for _, value := range ums.users {
-					usersArr[i] = value
-					i++
-				}
-				exported := exportUsers(usersArr)
-				// TODO(vmykh): wtf is 0644 ?
-				dir, err := os.Getwd()
-				utils.PanicIfError(err)
-				fmt.Println(exported)
-				err = ioutil.WriteFile(dir + "/server/users.dat", []byte(exported), 0644)
-				utils.PanicIfError(err)
-				fmt.Println("File Written")
-				ums.mutex.Unlock()
-			case <- quit:
-				ticker.Stop()
-				return
-			}
-		}
-	}()
+	savePeriod := 10 * time.Second
+	startSavingPeriodically(servState, savePeriod)
 
 	fmt.Println(servState.usrManager)
 
@@ -83,6 +57,36 @@ func StartServer() {
 		go handleClient(conn, servState)
 	}
 
+}
+func startSavingPeriodically(servState *server, period time.Duration) {
+	ticker := time.NewTicker(period)
+	quit := make(chan struct{})
+	go func() {
+		for {
+			select {
+			case <- ticker.C:
+				ums := servState.usrManager.(*userManagerState)
+				ums.mutex.Lock()
+				usersArr := make([]user, len(ums.users))
+				i := 0
+				for _, value := range ums.users {
+					usersArr[i] = value
+					i++
+				}
+				exported := exportUsers(usersArr)
+				// TODO(vmykh): wtf is 0644 ?
+				dir, err := os.Getwd()
+				utils.PanicIfError(err)
+				err = ioutil.WriteFile(dir + "/server/users.dat", []byte(exported), 0644)
+				utils.PanicIfError(err)
+				//fmt.Println("File Written")
+				ums.mutex.Unlock()
+			case <- quit:
+				ticker.Stop()
+				return
+			}
+		}
+	}()
 }
 
 func loadServerState() *server {
@@ -121,8 +125,11 @@ func handleClient(conn net.Conn, serverState *server) {
 
 	clientCert := &peersConnReq.ClientCert
 
+	timestamp, err := timeprovider.GetTimeFromProvider(serverState.tsAddr, serverState.tsPub)
+	utils.PanicIfError(err)
+
 	// TODO(vmykh): maybe make function like fetchPubKey that will also do verification ?
-	err = protocol.VerifyCertificate(clientCert, serverState.trentPub)
+	err = protocol.VerifyCertificate(clientCert, serverState.trentPub, timestamp)
 	utils.PanicIfError(err)
 
 	clientPub, err := protocol.ParsePublikKey(clientCert.Pub)
@@ -237,6 +244,10 @@ func (uh *userHandlerState) login(login string, password string) error {
 
 	if password != usr.Password {
 		return errors.New("Password is not correct")
+	}
+
+	if usr.IsBanned {
+		return errors.New("User is banned")
 	}
 
 	uh.usr = &usr

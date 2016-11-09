@@ -1,6 +1,7 @@
 # login;password;is_admin;is_banned
 
-syrnyk;kiev;false;false
+svyryd;football;false;false
+syrnyk;kiev;false;true
+pylyp;security;false;false
 admin;admin;true;false
 lev;54321;false;false
-svyryd;football;false;false

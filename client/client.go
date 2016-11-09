@@ -21,6 +21,8 @@ import (
 	"bufio"
 	"libs/gopass"
 	"strconv"
+	"strings"
+	"github.com/vmykh/infosec/lab2/timeprovider"
 )
 
 const ClientID = "client_1"
@@ -87,6 +89,13 @@ func main() {
 	r1 := int32(rand.Int())
 	fmt.Printf("rand: %d\n", r1)
 
+	timestamp, err := timeprovider.GetTimeFromProvider(clientState.tsAddr, clientState.tsPub)
+	utils.PanicIfError(err)
+
+	err = protocol.VerifyCertificate(&trentRes.ClientCert, clientState.trentPub, timestamp)
+	utils.PanicIfError(err)
+
+
 	serverPub, err := protocol.ParsePublikKey(trentRes.ServerCert.Pub)
 	utils.PanicIfError(err)
 	r1Encrypted := protocol.EncryptNumber(r1, serverPub)
@@ -124,27 +133,36 @@ func main() {
 func startSession(conn net.Conn) {
 
 	reader := bufio.NewReader(os.Stdin)
-	fmt.Print("Enter login: ")
-	login , _ := reader.ReadString('\n')
-	login = login[:len(login) - 1]
 
-	fmt.Println("Enter password:")
-	passBytes, err := gopass.GetPasswdMasked()
-	if err != nil {
-		os.Exit(1)
+	for {
+		fmt.Println("-----")
+		fmt.Print("Enter login: ")
+		login , _ := reader.ReadString('\n')
+		login = login[:len(login) - 1]
+
+		fmt.Println("Enter password:")
+		passBytes, err := gopass.GetPasswdMasked()
+		if err != nil {
+			os.Exit(1)
+		}
+		pass := string(passBytes)
+
+		msgBytes, err := protocol.ConstructNetworkMessage(&protocol.LoginRequest{login, pass})
+		utils.PanicIfError(err)
+		_, err = conn.Write(msgBytes)
+		utils.PanicIfError(err)
+
+		msg, err := protocol.ReadNetworkMessage(conn)
+		utils.PanicIfError(err)
+		servRes := msg.(*protocol.ServerResponse)
+		fmt.Println("=====")
+		fmt.Println(servRes.Message)
+		if strings.Contains(servRes.Message, "Successful") {
+			break
+		}
 	}
-	pass := string(passBytes)
 
-	msgBytes, err := protocol.ConstructNetworkMessage(&protocol.LoginRequest{login, pass})
-	utils.PanicIfError(err)
-	_, err = conn.Write(msgBytes)
-	utils.PanicIfError(err)
-
-	msg, err := protocol.ReadNetworkMessage(conn)
-	utils.PanicIfError(err)
-	fmt.Println("=====")
-	fmt.Println(msg)
-
+	LABEL:
 	for {
 		fmt.Println("-----")
 		fmt.Println("Available actions:")
@@ -178,9 +196,49 @@ func startSession(conn net.Conn) {
 			utils.PanicIfError(err)
 			_, err = conn.Write(msgBytes)
 			utils.PanicIfError(err)
+		case 2:
+			fmt.Println("Enter document name:")
+			input , _ := reader.ReadString('\n')
+			docname := input[:len(input) - 1]
+
+			msgBytes, err := protocol.ConstructNetworkMessage(&protocol.FetchDocumentRequest{docname})
+			utils.PanicIfError(err)
+			_, err = conn.Write(msgBytes)
+			utils.PanicIfError(err)
+		case 3:
+			fmt.Println("Enter user name:")
+			input , _ := reader.ReadString('\n')
+			uname := input[:len(input) - 1]
+
+			fmt.Println("Enter user password:")
+			passBytes, err := gopass.GetPasswdMasked()
+			if err != nil {
+				os.Exit(1)
+			}
+			upass := string(passBytes)
+
+			msgBytes, err := protocol.ConstructNetworkMessage(&protocol.AddUserRequest{uname, upass})
+			utils.PanicIfError(err)
+			_, err = conn.Write(msgBytes)
+			utils.PanicIfError(err)
+		case 4:
+			fmt.Println("Enter user name:")
+			input , _ := reader.ReadString('\n')
+			uname := input[:len(input) - 1]
+
+			msgBytes, err := protocol.ConstructNetworkMessage(&protocol.BlockUserRequest{uname})
+			utils.PanicIfError(err)
+			_, err = conn.Write(msgBytes)
+			utils.PanicIfError(err)
+		case 5:
+			msgBytes, err := protocol.ConstructNetworkMessage(&protocol.CloseSessionRequest{})
+			utils.PanicIfError(err)
+			_, err = conn.Write(msgBytes)
+			utils.PanicIfError(err)
+			break LABEL
 		default:
 			fmt.Println("Unrecognized command")
-			continue
+			continue LABEL
 		}
 
 		msg, err := protocol.ReadNetworkMessage(conn)
