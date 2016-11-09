@@ -16,6 +16,11 @@ import (
 	"github.com/vmykh/infosec/lab2/utils"
 	"log"
 	"reflect"
+	//"libs/gopass"
+	"os"
+	"bufio"
+	"libs/gopass"
+	"strconv"
 )
 
 const ClientID = "client_1"
@@ -33,30 +38,6 @@ type client struct {
 
 // TODO(vmykh): make consistent error handling
 func main() {
-	//fmt.Println("Enter password:")
-	//pass, err := gopass.GetPasswdMasked()
-	//if err != nil {
-	//	os.Exit(1)
-	//}
-	//fmt.Printf("success: %s", pass)
-
-	//serverAddr, err := net.ResolveTCPAddr("tcp4", "localhost:7500")
-	//utils.ExitIfError(err)
-	//conn, err := net.DialTCP("tcp", nil, serverAddr)
-	//utils.ExitIfError(err)
-	//
-	//var inputNetwork bytes.Buffer
-	//enc := gob.NewEncoder(&inputNetwork)
-	//
-	//enc.Encode(protocol.TrentRequest{"client-foo", "server-bar"})
-	//
-	////conn.Write([]byte("i'm not a gatussso, SOOOOQAAA!!!!"))
-	//conn.Write(inputNetwork.Bytes())
-	//
-	//time.Now()
-
-	//GetTimeFromServer()
-
 	clientState := loadClientState()
 
 	trentAddr, err := net.ResolveTCPAddr("tcp4", "localhost:7500")
@@ -141,25 +122,84 @@ func main() {
 }
 
 func startSession(conn net.Conn) {
-	msgBytes, err := protocol.ConstructNetworkMessage(&protocol.LoginRequest{"admin", "admin"})
+
+	reader := bufio.NewReader(os.Stdin)
+	fmt.Print("Enter login: ")
+	login , _ := reader.ReadString('\n')
+	login = login[:len(login) - 1]
+
+	fmt.Println("Enter password:")
+	passBytes, err := gopass.GetPasswdMasked()
+	if err != nil {
+		os.Exit(1)
+	}
+	pass := string(passBytes)
+
+	msgBytes, err := protocol.ConstructNetworkMessage(&protocol.LoginRequest{login, pass})
 	utils.PanicIfError(err)
 	_, err = conn.Write(msgBytes)
 	utils.PanicIfError(err)
 
 	msg, err := protocol.ReadNetworkMessage(conn)
 	utils.PanicIfError(err)
-	fmt.Println("Received: ")
+	fmt.Println("=====")
 	fmt.Println(msg)
 
-	msgBytes2, err := protocol.ConstructNetworkMessage(&protocol.AddUserRequest{"syrnyk", "kiev"})
-	utils.PanicIfError(err)
-	_, err = conn.Write(msgBytes2)
-	utils.PanicIfError(err)
+	for {
+		fmt.Println("-----")
+		fmt.Println("Available actions:")
+		fmt.Println("1 - Change Password")
+		fmt.Println("2 - Fetch Document")
+		fmt.Println("3 - Add User")
+		fmt.Println("4 - Block User")
+		fmt.Println("5 - Exit")
+		fmt.Print("Your choice: ")
+		actionStr , _ := reader.ReadString('\n')
+		action, err := strconv.Atoi(actionStr[:len(actionStr) - 1])
+		utils.PanicIfError(err)
 
-	msg, err = protocol.ReadNetworkMessage(conn)
-	utils.PanicIfError(err)
-	fmt.Println("Received: ")
-	fmt.Println(msg)
+		switch action {
+		case 1:
+			fmt.Println("Enter old password:")
+			passBytes, err := gopass.GetPasswdMasked()
+			if err != nil {
+				os.Exit(1)
+			}
+			oldpass := string(passBytes)
+
+			fmt.Println("Enter new password:")
+			passBytes, err = gopass.GetPasswdMasked()
+			if err != nil {
+				os.Exit(1)
+			}
+			newpass := string(passBytes)
+
+			msgBytes, err := protocol.ConstructNetworkMessage(&protocol.ChangePasswordRequest{oldpass, newpass})
+			utils.PanicIfError(err)
+			_, err = conn.Write(msgBytes)
+			utils.PanicIfError(err)
+		default:
+			fmt.Println("Unrecognized command")
+			continue
+		}
+
+		msg, err := protocol.ReadNetworkMessage(conn)
+		utils.PanicIfError(err)
+		servRes := msg.(*protocol.ServerResponse)
+		fmt.Println("=====")
+		fmt.Println(servRes.Message)
+
+	}
+
+	//msgBytes2, err := protocol.ConstructNetworkMessage(&protocol.AddUserRequest{"syrnyk", "kiev"})
+	//utils.PanicIfError(err)
+	//_, err = conn.Write(msgBytes2)
+	//utils.PanicIfError(err)
+	//
+	//msg, err = protocol.ReadNetworkMessage(conn)
+	//utils.PanicIfError(err)
+	//fmt.Println("Received: ")
+	//fmt.Println(msg)
 }
 
 func loadClientState() *client {

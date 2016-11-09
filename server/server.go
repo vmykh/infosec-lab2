@@ -160,6 +160,7 @@ func startSession(conn net.Conn, handler userHandler) {
 			fmt.Println("error: " + err.Error())
 			break
 		}
+		fmt.Println(msg)
 		var resMsg string
 		switch m := msg.(type) {
 		case *protocol.LoginRequest:
