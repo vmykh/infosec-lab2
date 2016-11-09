@@ -29,6 +29,15 @@ const (
 
 	PeersConnectRequestCode = 5
 	PeersConnectResponseCode = 6
+
+	LoginRequestCode = 10
+	ChangePasswordRequestCode = 11
+	AddUserRequestCode = 12
+	BlockUserRequestCode = 13
+	FetchDocumentRequestCode = 14
+	CloseSessionRequestCode = 15
+
+	ServerResponseCode = 20
 )
 
 const (
@@ -258,6 +267,23 @@ func determineMsgCode(m interface{}) (int, error){
 		return PeersConnectRequestCode, nil
 	case *PeersConnectResponse:
 		return PeersConnectResponseCode, nil
+
+	// session
+	case *LoginRequest:
+		return LoginRequestCode, nil
+	case *ChangePasswordRequest:
+		return ChangePasswordRequestCode, nil
+	case *AddUserRequest:
+		return AddUserRequestCode, nil
+	case *BlockUserRequest:
+		return BlockUserRequestCode, nil
+	case *FetchDocumentRequest:
+		return FetchDocumentRequestCode, nil
+	case *CloseSessionRequest:
+		return CloseSessionRequestCode, nil
+	case *ServerResponse:
+		return ServerResponseCode, nil
+
 	default:
 		return 0, errors.New("Cannot determine message code for: " + reflect.TypeOf(m).String())
 	}
@@ -278,6 +304,22 @@ func createTargetType(msgCode int) (interface{}, error) {
 		return new(PeersConnectRequest), nil
 	case PeersConnectResponseCode:
 		return new(PeersConnectResponse), nil
+
+	// session
+	case LoginRequestCode:
+		return new(LoginRequest), nil
+	case ChangePasswordRequestCode:
+		return new(ChangePasswordRequest), nil
+	case AddUserRequestCode:
+		return new(AddUserRequest), nil
+	case BlockUserRequestCode:
+		return new(BlockUserRequest), nil
+	case FetchDocumentRequestCode:
+		return new(FetchDocumentRequest), nil
+	case CloseSessionRequestCode:
+		return new(CloseSessionRequest), nil
+	case ServerResponseCode:
+		return new(ServerResponse), nil
 	default:
 		return nil, errors.New("Invalid message code")
 	}
@@ -400,6 +442,39 @@ func (sc *SecureConn) SetWriteDeadline(t time.Time) error {
 }
 // endregion
 
+// region session
+type LoginRequest struct {
+	Login string
+	Password string
+}
+
+type ChangePasswordRequest struct{
+	Oldpass string
+	Newpass string
+
+}
+
+type AddUserRequest struct {
+	Uname string
+	Upass string
+}
+
+type BlockUserRequest struct {
+	Uname string
+}
+
+type FetchDocumentRequest struct {
+	Docname string
+}
+
+type CloseSessionRequest struct {
+}
+
+type ServerResponse struct {
+	Message string
+}
+
+// endregion
 
 //func CreateMessage(int,msg interface{}) []byte {
 //

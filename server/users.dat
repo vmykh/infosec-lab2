@@ -1,4 +1,6 @@
-# structure: login;password;is_admin;is_banned
+# login;password;is_admin;is_banned
+
 admin;admin;true;false
 lev;12345;false;false
 svyryd;football;false;false
+syrnyk;kiev;false;false

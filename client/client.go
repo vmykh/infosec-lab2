@@ -141,7 +141,25 @@ func main() {
 }
 
 func startSession(conn net.Conn) {
-	conn.Write([]byte{50, 55, 60})
+	msgBytes, err := protocol.ConstructNetworkMessage(&protocol.LoginRequest{"admin", "admin"})
+	utils.PanicIfError(err)
+	_, err = conn.Write(msgBytes)
+	utils.PanicIfError(err)
+
+	msg, err := protocol.ReadNetworkMessage(conn)
+	utils.PanicIfError(err)
+	fmt.Println("Received: ")
+	fmt.Println(msg)
+
+	msgBytes2, err := protocol.ConstructNetworkMessage(&protocol.AddUserRequest{"syrnyk", "kiev"})
+	utils.PanicIfError(err)
+	_, err = conn.Write(msgBytes2)
+	utils.PanicIfError(err)
+
+	msg, err = protocol.ReadNetworkMessage(conn)
+	utils.PanicIfError(err)
+	fmt.Println("Received: ")
+	fmt.Println(msg)
 }
 
 func loadClientState() *client {
