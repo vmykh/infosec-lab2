@@ -312,6 +312,11 @@ func (uh *userHandlerState) changePassword(oldpass string, newpass string) error
 }
 
 func (uh *userHandlerState) fetchDocument(name string) (string, error) {
-	return "bla-bla-bla-document", nil
+	dir, err := os.Getwd()
+	if err != nil {
+		return "", err
+	}
+	userFileBytes, err := ioutil.ReadFile(dir + "/server/files/" + name)
+	return string(userFileBytes), nil
 }
 // endregion

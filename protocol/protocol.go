@@ -205,7 +205,7 @@ func ParsePublikKey(keyStr string) (*rsa.PublicKey, error) {
 // endregion
 
 // region common
-func ConstructNetworkMessage(m interface{}) ([]byte, error) {
+func 	ConstructNetworkMessage(m interface{}) ([]byte, error) {
 	jsonBytes, err := json.Marshal(m)
 	if err != nil {
 		return nil, err
